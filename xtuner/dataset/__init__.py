@@ -9,6 +9,7 @@ from .intern_repo import (build_packed_dataset,
 from .internvl_dataset import InternVL_V1_5_Dataset
 from .json_dataset import load_json_file
 from .llava import LLaVADataset
+from .s2s_transformer import S2S_TRANSFORMER_Dataset
 from .modelscope import process_ms_dataset
 from .moss_sft import MOSSSFTDataset
 from .refcoco_json import (InvRefCOCOJsonDataset, RefCOCOJsonDataset,
@@ -25,5 +26,5 @@ __all__ = [
     'load_intern_repo_tokenized_dataset',
     'load_intern_repo_untokenized_dataset', 'build_packed_dataset',
     'RefCOCOJsonDataset', 'RefCOCOJsonEvalDataset', 'InvRefCOCOJsonDataset',
-    'load_json_file', 'InternVL_V1_5_Dataset'
+    'load_json_file', 'InternVL_V1_5_Dataset', 'S2S_TRANSFORMER_Dataset'
 ]
