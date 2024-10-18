@@ -39,6 +39,8 @@ from .utils import (LoadWoInit, find_all_linear_names,
                     make_inputs_require_grad,
                     prepare_inputs_labels_for_multimodal, traverse_dict)
 
+from fairseq.models.text_to_speech.vocoder import CodeHiFiGANVocoder
+
 
 class AudioProjectorConfig(PretrainedConfig):
     model_type = 'projector'
@@ -87,7 +89,7 @@ class AudioEncoder(PreTrainedModel):
         return layer_outputs
     
 class S2S_Transformer_Model(BaseModel):
-    def __init__(self, llm, speech_encoder, freeze_llm=False, freeze_speech_encoder=False, speech_select_layer=-1,
+    def __init__(self, llm, speech_encoder, vocoder=None,freeze_llm=False, freeze_speech_encoder=False, speech_select_layer=-1,
                  pretrained_pth=None, projector_depth=2, llm_lora=None, speech_encoder_lora=None,
                  use_activation_checkpointing=True):
         # llm --> language model to use
@@ -96,6 +98,7 @@ class S2S_Transformer_Model(BaseModel):
         super().__init__()
         self.freeze_llm = freeze_llm
         self.freeze_speech_encoder = freeze_speech_encoder
+        self.vocoder = vocoder if vocoder else None #  mHubert used for speech generation from llm last layer tokens 
         # LoadWoInit --> A utility that loads the LLM and speech encoder without initializing them
         with LoadWoInit():
             self.llm = self._build_from_cfg_or_module(llm)
@@ -267,7 +270,17 @@ class S2S_Transformer_Model(BaseModel):
         if mode == 'loss':
             return self.compute_loss(data, data_samples)
         elif mode == 'predict':
-            return self.predict(data, data_samples)
+            outputs = self.llm(**data)
+            last_layer_tokens = outputs.logits
+            logits_dict = [{'logits': logits} for logits in outputs.logits]
+            # In predicted mode, if vocoder is not None, then we will generate speech from last layer tokens
+            if self.vocoder is not None:
+                speech = self.vocoder(last_layer_tokens)  # Convert tokens to waveform
+            else:
+                speech = None
+            
+            return {"speech": speech, "logits": logits_dict}
+        
         elif mode == 'tensor':
             return self._forward(data, data_samples)
         else:
@@ -278,11 +291,6 @@ class S2S_Transformer_Model(BaseModel):
         outputs = self.llm(**data)
 
         return outputs
-
-    def predict(self, data, data_samples=None):
-        outputs = self.llm(**data)
-        logits_dict = [{'logits': logits} for logits in outputs.logits]
-        return logits_dict
 
     def compute_loss(self, data, data_samples=None):
         outputs = self.llm(**data)
